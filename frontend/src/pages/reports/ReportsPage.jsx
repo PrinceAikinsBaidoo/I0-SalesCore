@@ -31,14 +31,22 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setLoading(true)
+    const now = new Date()
+    const fromDate = new Date(now)
+    if (period === 'daily') {
+      fromDate.setHours(0, 0, 0, 0)
+    } else {
+      fromDate.setDate(fromDate.getDate() - 7)
+    }
+    const supplierRange = { from: fromDate.toISOString(), to: now.toISOString() }
     const summaryFn = period === 'daily' ? reportsApi.daily : reportsApi.weekly
     Promise.all([
       summaryFn(),
       reportsApi.topProducts({ limit: 8 }),
       reportsApi.cashiers({}),
       reportsApi.inventory(),
-      reportsApi.supplierSummary({}),
-      reportsApi.topSuppliers({ limit: 8 }),
+      reportsApi.supplierSummary(supplierRange),
+      reportsApi.topSuppliers({ ...supplierRange, limit: 8 }),
     ]).then(([s, tp, c, inv, supSummary, supTop]) => {
       setSummary(s.data)
       setTopProducts(tp.data.map(row => ({ name: row[1], qty: Number(row[2]), revenue: Number(row[3]) })))
@@ -136,7 +144,9 @@ export default function ReportsPage() {
           {supplierSummary && (
             <>
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Supplier Restocking (30 Days)</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                  Supplier Restocking ({period === 'daily' ? 'Today' : 'This Week'})
+                </p>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   <StatCard label="Active Suppliers" value={supplierSummary.supplierCount ?? 0} icon={Truck} color="bg-indigo-100 text-indigo-600" />
                   <StatCard label="Units Restocked" value={supplierSummary.totalRestockedQty ?? 0} icon={Package} color="bg-blue-100 text-blue-600" />
