@@ -1,5 +1,6 @@
 package com.iolabs.salescore.service;
 
+import com.iolabs.salescore.dto.request.CancelPurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.CreatePurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.GenerateLowStockPurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.ReceivePurchaseOrderRequest;
@@ -18,7 +19,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -36,18 +39,65 @@ public class PurchaseOrderService {
 
     private static final AtomicInteger SEQ = new AtomicInteger(1);
 
-    public List<PurchaseOrderResponse> getAll(Long supplierId, String statusRaw) {
-        PurchaseOrder.Status status = null;
-        if (statusRaw != null && !statusRaw.isBlank()) {
-            try {
-                status = PurchaseOrder.Status.valueOf(statusRaw.trim().toUpperCase());
-            } catch (IllegalArgumentException ex) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid status: " + statusRaw);
-            }
+    private static final List<PurchaseOrder.Status> OPEN_FOR_DELIVERY = List.of(
+            PurchaseOrder.Status.APPROVED,
+            PurchaseOrder.Status.PARTIALLY_RECEIVED
+    );
+
+    public List<PurchaseOrderResponse> getAll(Long supplierId, String statusRaw, boolean overdueOnly) {
+        PurchaseOrder.Status status = parseStatus(statusRaw);
+        List<PurchaseOrder> list = overdueOnly
+                ? purchaseOrderRepository.findOverdueWithFilters(
+                supplierId,
+                status,
+                LocalDate.now(ZoneId.systemDefault()),
+                OPEN_FOR_DELIVERY
+        )
+                : purchaseOrderRepository.findAllWithFilters(supplierId, status);
+        return list.stream().map(this::toResponse).toList();
+    }
+
+    public byte[] exportCsv(Long supplierId, String statusRaw, boolean overdueOnly) {
+        List<PurchaseOrderResponse> rows = getAll(supplierId, statusRaw, overdueOnly);
+        String header = "id,poNumber,supplierName,status,expectedDate,overdue,itemCount,totalOrderedQty,totalReceivedQty,createdAt,notes";
+        String body = rows.stream().map(this::poCsvLine).reduce((a, b) -> a + "\n" + b).orElse("");
+        String csv = header + (body.isEmpty() ? "" : "\n" + body);
+        return csv.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String poCsvLine(PurchaseOrderResponse po) {
+        int totalOrdered = po.items().stream().mapToInt(PurchaseOrderResponse.Item::orderedQuantity).sum();
+        int totalReceived = po.items().stream().mapToInt(PurchaseOrderResponse.Item::receivedQuantity).sum();
+        return String.join(",",
+                csv(po.id()),
+                csv(po.poNumber()),
+                csv(po.supplierName()),
+                csv(po.status()),
+                csv(po.expectedDate()),
+                csv(po.overdue()),
+                csv(po.items().size()),
+                csv(totalOrdered),
+                csv(totalReceived),
+                csv(po.createdAt()),
+                csv(po.notes())
+        );
+    }
+
+    private String csv(Object v) {
+        if (v == null) return "";
+        String s = String.valueOf(v);
+        if (s.contains("\"")) s = s.replace("\"", "\"\"");
+        if (s.contains(",") || s.contains("\n") || s.contains("\r")) return "\"" + s + "\"";
+        return s;
+    }
+
+    private PurchaseOrder.Status parseStatus(String statusRaw) {
+        if (statusRaw == null || statusRaw.isBlank()) return null;
+        try {
+            return PurchaseOrder.Status.valueOf(statusRaw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid status: " + statusRaw);
         }
-        return purchaseOrderRepository.findAllWithFilters(supplierId, status).stream()
-                .map(this::toResponse)
-                .toList();
     }
 
     public PurchaseOrderResponse getById(Long id) {
@@ -231,6 +281,49 @@ public class PurchaseOrderService {
         return toResponse(purchaseOrderRepository.save(po));
     }
 
+    @Transactional
+    public PurchaseOrderResponse close(Long id) {
+        PurchaseOrder po = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", id));
+        if (po.getStatus() != PurchaseOrder.Status.RECEIVED && po.getStatus() != PurchaseOrder.Status.PARTIALLY_RECEIVED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Only RECEIVED or PARTIALLY_RECEIVED purchase orders can be closed");
+        }
+        po.setStatus(PurchaseOrder.Status.CLOSED);
+        return toResponse(purchaseOrderRepository.save(po));
+    }
+
+    @Transactional
+    public PurchaseOrderResponse cancel(Long id, CancelPurchaseOrderRequest request) {
+        PurchaseOrder po = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", id));
+        if (po.getStatus() == PurchaseOrder.Status.CANCELLED || po.getStatus() == PurchaseOrder.Status.CLOSED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Purchase order is already finalised");
+        }
+        if (po.getStatus() == PurchaseOrder.Status.PARTIALLY_RECEIVED || po.getStatus() == PurchaseOrder.Status.RECEIVED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Cannot cancel a purchase order that has received stock; close it instead if needed");
+        }
+        if (po.getStatus() == PurchaseOrder.Status.APPROVED) {
+            boolean anyReceived = po.getItems().stream()
+                    .anyMatch(i -> i.getReceivedQuantity() != null && i.getReceivedQuantity() > 0);
+            if (anyReceived) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "Cannot cancel after stock has been received; use Receive or Close workflows");
+            }
+        }
+        String note = request != null && request.notes() != null && !request.notes().isBlank()
+                ? "Cancelled: " + request.notes().trim()
+                : "Cancelled";
+        if (po.getNotes() == null || po.getNotes().isBlank()) {
+            po.setNotes(note);
+        } else {
+            po.setNotes(po.getNotes() + "\n" + note);
+        }
+        po.setStatus(PurchaseOrder.Status.CANCELLED);
+        return toResponse(purchaseOrderRepository.save(po));
+    }
+
     private String generatePoNumber() {
         String date = DateTimeFormatter.ofPattern("yyyyMMdd")
                 .withZone(ZoneId.systemDefault())
@@ -249,6 +342,14 @@ public class PurchaseOrderService {
         return Math.max(target - current, 1);
     }
 
+    private boolean computeOverdue(PurchaseOrder po) {
+        if (po.getExpectedDate() == null) return false;
+        if (po.getStatus() != PurchaseOrder.Status.APPROVED && po.getStatus() != PurchaseOrder.Status.PARTIALLY_RECEIVED) {
+            return false;
+        }
+        return po.getExpectedDate().isBefore(LocalDate.now(ZoneId.systemDefault()));
+    }
+
     private PurchaseOrderResponse toResponse(PurchaseOrder po) {
         return new PurchaseOrderResponse(
                 po.getId(),
@@ -257,6 +358,7 @@ public class PurchaseOrderService {
                 po.getSupplier().getId(),
                 po.getSupplier().getName(),
                 po.getExpectedDate(),
+                computeOverdue(po),
                 po.getNotes(),
                 po.getCreatedBy().getId(),
                 po.getCreatedBy().getFullName(),

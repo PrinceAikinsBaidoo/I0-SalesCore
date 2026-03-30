@@ -1,5 +1,6 @@
 package com.iolabs.salescore.controller;
 
+import com.iolabs.salescore.dto.request.CancelPurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.CreatePurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.GenerateLowStockPurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.ReceivePurchaseOrderRequest;
@@ -16,6 +17,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -30,9 +33,24 @@ public class PurchaseOrderController {
     @GetMapping
     public ResponseEntity<List<PurchaseOrderResponse>> getAll(
             @RequestParam(required = false) Long supplierId,
-            @RequestParam(required = false) String status
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "false") boolean overdueOnly
     ) {
-        return ResponseEntity.ok(purchaseOrderService.getAll(supplierId, status));
+        return ResponseEntity.ok(purchaseOrderService.getAll(supplierId, status, overdueOnly));
+    }
+
+    @GetMapping("/export/csv")
+    public ResponseEntity<byte[]> exportCsv(
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "false") boolean overdueOnly
+    ) {
+        byte[] bytes = purchaseOrderService.exportCsv(supplierId, status, overdueOnly);
+        String filename = "purchase-orders-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".csv";
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .header("Content-Type", "text/csv")
+                .body(bytes);
     }
 
     @GetMapping("/{id}")
@@ -76,5 +94,18 @@ public class PurchaseOrderController {
             @AuthenticationPrincipal AppUserDetails user
     ) {
         return ResponseEntity.ok(purchaseOrderService.receive(id, request, user.getId()));
+    }
+
+    @PostMapping("/{id}/close")
+    public ResponseEntity<PurchaseOrderResponse> close(@PathVariable Long id) {
+        return ResponseEntity.ok(purchaseOrderService.close(id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<PurchaseOrderResponse> cancel(
+            @PathVariable Long id,
+            @RequestBody(required = false) CancelPurchaseOrderRequest request
+    ) {
+        return ResponseEntity.ok(purchaseOrderService.cancel(id, request));
     }
 }

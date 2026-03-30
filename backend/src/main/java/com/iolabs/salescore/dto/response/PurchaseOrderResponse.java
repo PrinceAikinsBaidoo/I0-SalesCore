@@ -12,6 +12,8 @@ public record PurchaseOrderResponse(
         Long supplierId,
         String supplierName,
         LocalDate expectedDate,
+        /** True when expected date is before today and status is still in-flight (approved / partial). */
+        boolean overdue,
         String notes,
         Long createdById,
         String createdByName,
