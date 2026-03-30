@@ -12,9 +12,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +114,37 @@ public class ReportController {
         return ResponseEntity.ok(restockRecordRepository.findTopSuppliers(f, t, PageRequest.of(0, limit)));
     }
 
+    @GetMapping("/suppliers/export/csv")
+    public ResponseEntity<byte[]> exportTopSuppliersCsv(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(defaultValue = "8") int limit
+    ) {
+        Instant f = from != null ? from : Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant t = to != null ? to : Instant.now();
+        List<Object[]> rows = restockRecordRepository.findTopSuppliers(f, t, PageRequest.of(0, limit));
+        String header = "supplierId,supplierName,restockCount,totalUnits,totalValue,lastDelivery,from,to";
+        String body = rows.stream()
+                .map(r -> String.join(",",
+                        csv(r[0]),
+                        csv(r[1]),
+                        csv(r[2]),
+                        csv(r[3]),
+                        csv(r[4]),
+                        csv(r[5]),
+                        csv(f),
+                        csv(t)
+                ))
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse("");
+        String csvData = header + (body.isEmpty() ? "" : "\n" + body);
+        String filename = "supplier-analytics-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".csv";
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .header("Content-Type", "text/csv")
+                .body(csvData.getBytes(StandardCharsets.UTF_8));
+    }
+
     private ResponseEntity<Map<String, Object>> buildSummary(Instant from, Instant to) {
         BigDecimal revenue = saleRepository.sumRevenueByDateRange(from, to);
         Long count = saleRepository.countByDateRange(from, to);
@@ -121,5 +155,13 @@ public class ReportController {
         summary.put("totalSales", count);
         summary.put("averageSale", count > 0 ? revenue.divide(BigDecimal.valueOf(count), 2, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO);
         return ResponseEntity.ok(summary);
+    }
+
+    private String csv(Object v) {
+        if (v == null) return "";
+        String s = String.valueOf(v);
+        if (s.contains("\"")) s = s.replace("\"", "\"\"");
+        if (s.contains(",") || s.contains("\n") || s.contains("\r")) return "\"" + s + "\"";
+        return s;
     }
 }

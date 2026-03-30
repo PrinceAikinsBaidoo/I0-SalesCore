@@ -3,7 +3,7 @@ import { reportsApi } from '@/api/sales'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { toast } from 'sonner'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { TrendingUp, ShoppingBag, DollarSign, Package, Truck } from 'lucide-react'
+import { TrendingUp, ShoppingBag, DollarSign, Package, Truck, Download } from 'lucide-react'
 
 function StatCard({ label, value, icon: Icon, color }) {
   return (
@@ -28,9 +28,9 @@ export default function ReportsPage() {
   const [supplierSummary, setSupplierSummary] = useState(null)
   const [topSuppliers, setTopSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
+  const [exportingSuppliers, setExportingSuppliers] = useState(false)
 
-  useEffect(() => {
-    setLoading(true)
+  const getSupplierRange = () => {
     const now = new Date()
     const fromDate = new Date(now)
     if (period === 'daily') {
@@ -38,7 +38,12 @@ export default function ReportsPage() {
     } else {
       fromDate.setDate(fromDate.getDate() - 7)
     }
-    const supplierRange = { from: fromDate.toISOString(), to: now.toISOString() }
+    return { from: fromDate.toISOString(), to: now.toISOString() }
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    const supplierRange = getSupplierRange()
     const summaryFn = period === 'daily' ? reportsApi.daily : reportsApi.weekly
     Promise.all([
       summaryFn(),
@@ -64,6 +69,30 @@ export default function ReportsPage() {
     }).catch(() => toast.error('Failed to load reports'))
       .finally(() => setLoading(false))
   }, [period])
+
+  const exportSupplierCsv = async () => {
+    setExportingSuppliers(true)
+    try {
+      const res = await reportsApi.exportTopSuppliersCsv({ ...getSupplierRange(), limit: 8 })
+      const contentDisposition = res.headers['content-disposition'] || ''
+      const filenameMatch = /filename="([^"]+)"/i.exec(contentDisposition)
+      const filename = filenameMatch?.[1] || 'supplier-analytics.csv'
+
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Supplier analytics exported')
+    } catch {
+      toast.error('Failed to export supplier analytics CSV')
+    } finally {
+      setExportingSuppliers(false)
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -144,9 +173,19 @@ export default function ReportsPage() {
           {supplierSummary && (
             <>
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                  Supplier Restocking ({period === 'daily' ? 'Today' : 'This Week'})
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Supplier Restocking ({period === 'daily' ? 'Today' : 'This Week'})
+                  </p>
+                  <button
+                    onClick={exportSupplierCsv}
+                    disabled={exportingSuppliers}
+                    className="press-feedback inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white text-xs rounded-lg"
+                  >
+                    <Download size={13} />
+                    {exportingSuppliers ? 'Exporting...' : 'Export CSV'}
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   <StatCard label="Active Suppliers" value={supplierSummary.supplierCount ?? 0} icon={Truck} color="bg-indigo-100 text-indigo-600" />
                   <StatCard label="Units Restocked" value={supplierSummary.totalRestockedQty ?? 0} icon={Package} color="bg-blue-100 text-blue-600" />

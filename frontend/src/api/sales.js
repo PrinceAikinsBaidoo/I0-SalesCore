@@ -20,4 +20,5 @@ export const reportsApi = {
   cashiers: (params) => client.get('/reports/cashiers', { params }),
   supplierSummary: (params) => client.get('/reports/suppliers/summary', { params }),
   topSuppliers: (params) => client.get('/reports/suppliers/top', { params }),
+  exportTopSuppliersCsv: (params) => client.get('/reports/suppliers/export/csv', { params, responseType: 'blob' }),
 }
