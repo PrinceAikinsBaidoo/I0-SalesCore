@@ -7,6 +7,7 @@ import LoginPage from '@/pages/auth/LoginPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import ProductsPage from '@/pages/products/ProductsPage'
 import SuppliersPage from '@/pages/suppliers/SuppliersPage'
+import PurchaseOrdersPage from '@/pages/purchaseOrders/PurchaseOrdersPage'
 import POSPage from '@/pages/sales/POSPage'
 import ReceiptPage from '@/pages/sales/ReceiptPage'
 import RefundsPage from '@/pages/sales/RefundsPage'
@@ -52,6 +53,9 @@ function AppRoutes() {
         } />
         <Route path="/suppliers" element={
           <ProtectedRoute roles={ROLE_GROUPS.adminManager}><SuppliersPage /></ProtectedRoute>
+        } />
+        <Route path="/purchase-orders" element={
+          <ProtectedRoute roles={ROLE_GROUPS.adminManager}><PurchaseOrdersPage /></ProtectedRoute>
         } />
         <Route path="/inventory" element={
           <ProtectedRoute roles={ROLE_GROUPS.adminManager}><InventoryPage /></ProtectedRoute>

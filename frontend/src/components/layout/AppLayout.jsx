@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   LayoutDashboard, ShoppingCart, Package, Warehouse,
-  Users, BarChart2, Settings, LogOut, UserCog, RotateCcw, Truck
+  Users, BarChart2, Settings, LogOut, UserCog, RotateCcw, Truck, ClipboardList
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLE_GROUPS } from '@/constants/roles'
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/pos', label: 'Point of Sale', icon: ShoppingCart, roles: ROLE_GROUPS.allOperational },
   { to: '/products', label: 'Products', icon: Package, roles: ROLE_GROUPS.adminManager },
   { to: '/suppliers', label: 'Suppliers', icon: Truck, roles: ROLE_GROUPS.adminManager },
+  { to: '/purchase-orders', label: 'Purchase Orders', icon: ClipboardList, roles: ROLE_GROUPS.adminManager },
   { to: '/inventory', label: 'Inventory', icon: Warehouse, roles: ROLE_GROUPS.adminManager },
   { to: '/customers', label: 'Customers', icon: Users, roles: ROLE_GROUPS.allOperational },
   { to: '/refunds', label: 'Refund History', icon: RotateCcw, roles: ROLE_GROUPS.allOperational },
