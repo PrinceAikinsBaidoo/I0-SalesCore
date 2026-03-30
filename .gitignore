@@ -26,6 +26,9 @@ lerna-debug.log*
 # Env and local config
 .env
 .env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 *.local
 
 # Java / Maven (backend)
