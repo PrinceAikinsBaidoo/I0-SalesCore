@@ -1,7 +1,9 @@
 package com.iolabs.salescore.controller;
 
 import com.iolabs.salescore.dto.request.CreatePurchaseOrderRequest;
+import com.iolabs.salescore.dto.request.GenerateLowStockPurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.ReceivePurchaseOrderRequest;
+import com.iolabs.salescore.dto.response.LowStockReorderSuggestionResponse;
 import com.iolabs.salescore.dto.response.PurchaseOrderResponse;
 import com.iolabs.salescore.security.AppUserDetails;
 import com.iolabs.salescore.service.PurchaseOrderService;
@@ -38,12 +40,25 @@ public class PurchaseOrderController {
         return ResponseEntity.ok(purchaseOrderService.getById(id));
     }
 
+    @GetMapping("/reorder-suggestions")
+    public ResponseEntity<List<LowStockReorderSuggestionResponse>> getReorderSuggestions() {
+        return ResponseEntity.ok(purchaseOrderService.getLowStockReorderSuggestions());
+    }
+
     @PostMapping
     public ResponseEntity<PurchaseOrderResponse> create(
             @Valid @RequestBody CreatePurchaseOrderRequest request,
             @AuthenticationPrincipal AppUserDetails user
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(purchaseOrderService.create(request, user.getId()));
+    }
+
+    @PostMapping("/generate-from-low-stock")
+    public ResponseEntity<PurchaseOrderResponse> generateFromLowStock(
+            @Valid @RequestBody GenerateLowStockPurchaseOrderRequest request,
+            @AuthenticationPrincipal AppUserDetails user
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(purchaseOrderService.createFromLowStock(request, user.getId()));
     }
 
     @PostMapping("/{id}/approve")

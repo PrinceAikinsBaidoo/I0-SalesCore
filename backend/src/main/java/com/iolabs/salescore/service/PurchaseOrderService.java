@@ -1,8 +1,10 @@
 package com.iolabs.salescore.service;
 
 import com.iolabs.salescore.dto.request.CreatePurchaseOrderRequest;
+import com.iolabs.salescore.dto.request.GenerateLowStockPurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.ReceivePurchaseOrderRequest;
 import com.iolabs.salescore.dto.request.RestockRequest;
+import com.iolabs.salescore.dto.response.LowStockReorderSuggestionResponse;
 import com.iolabs.salescore.dto.response.PurchaseOrderResponse;
 import com.iolabs.salescore.exception.ApiException;
 import com.iolabs.salescore.exception.ResourceNotFoundException;
@@ -54,6 +56,19 @@ public class PurchaseOrderService {
         return toResponse(po);
     }
 
+    public List<LowStockReorderSuggestionResponse> getLowStockReorderSuggestions() {
+        return productRepository.findLowStockProducts().stream()
+                .map(p -> new LowStockReorderSuggestionResponse(
+                        p.getId(),
+                        p.getName(),
+                        p.getQuantity(),
+                        p.getLowStockThreshold(),
+                        suggestedOrderQty(p),
+                        p.getCostPrice()
+                ))
+                .toList();
+    }
+
     @Transactional
     public PurchaseOrderResponse create(CreatePurchaseOrderRequest request, Long userId) {
         Supplier supplier = supplierRepository.findById(request.supplierId())
@@ -87,6 +102,65 @@ public class PurchaseOrderService {
             items.add(item);
         }
         po.getItems().addAll(items);
+        PurchaseOrder saved = purchaseOrderRepository.save(po);
+        PurchaseOrder loaded = purchaseOrderRepository.findById(saved.getId()).orElse(saved);
+        return toResponse(loaded);
+    }
+
+    @Transactional
+    public PurchaseOrderResponse createFromLowStock(GenerateLowStockPurchaseOrderRequest request, Long userId) {
+        Supplier supplier = supplierRepository.findById(request.supplierId())
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier", request.supplierId()));
+        if (!supplier.isActive()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Supplier is inactive");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        Map<Long, Product> lowStockProducts = productRepository.findLowStockProducts().stream()
+                .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+        if (lowStockProducts.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "No low-stock products found");
+        }
+
+        Map<Long, Integer> orderQtyByProductId = new LinkedHashMap<>();
+        if (request.items() == null || request.items().isEmpty()) {
+            for (Product p : lowStockProducts.values()) {
+                orderQtyByProductId.put(p.getId(), suggestedOrderQty(p));
+            }
+        } else {
+            for (GenerateLowStockPurchaseOrderRequest.Item item : request.items()) {
+                Product p = lowStockProducts.get(item.productId());
+                if (p == null) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "Product is not currently low-stock: " + item.productId());
+                }
+                orderQtyByProductId.merge(item.productId(), item.quantity(), Integer::sum);
+            }
+        }
+
+        PurchaseOrder po = PurchaseOrder.builder()
+                .poNumber(generatePoNumber())
+                .supplier(supplier)
+                .status(PurchaseOrder.Status.DRAFT)
+                .createdBy(user)
+                .expectedDate(request.expectedDate())
+                .notes(request.notes())
+                .build();
+
+        List<PurchaseOrderItem> items = new ArrayList<>();
+        for (Map.Entry<Long, Integer> e : orderQtyByProductId.entrySet()) {
+            Product product = lowStockProducts.get(e.getKey());
+            PurchaseOrderItem item = PurchaseOrderItem.builder()
+                    .purchaseOrder(po)
+                    .product(product)
+                    .orderedQuantity(e.getValue())
+                    .receivedQuantity(0)
+                    .unitCost(product.getCostPrice())
+                    .build();
+            items.add(item);
+        }
+        po.getItems().addAll(items);
+
         PurchaseOrder saved = purchaseOrderRepository.save(po);
         PurchaseOrder loaded = purchaseOrderRepository.findById(saved.getId()).orElse(saved);
         return toResponse(loaded);
@@ -166,6 +240,13 @@ public class PurchaseOrderService {
             seq = String.format("%04d", SEQ.getAndIncrement());
         } while (purchaseOrderRepository.existsByPoNumber("PO-" + date + "-" + seq));
         return "PO-" + date + "-" + seq;
+    }
+
+    private int suggestedOrderQty(Product p) {
+        int threshold = p.getLowStockThreshold() != null ? p.getLowStockThreshold() : 0;
+        int target = threshold * 2;
+        int current = p.getQuantity() != null ? p.getQuantity() : 0;
+        return Math.max(target - current, 1);
     }
 
     private PurchaseOrderResponse toResponse(PurchaseOrder po) {

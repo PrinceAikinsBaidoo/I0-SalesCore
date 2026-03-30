@@ -4,7 +4,7 @@ import { suppliersApi } from '@/api/suppliers'
 import { productsApi } from '@/api/products'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { toast } from 'sonner'
-import { ClipboardList, Plus, CheckCircle2, Inbox, X } from 'lucide-react'
+import { ClipboardList, Plus, CheckCircle2, Inbox, X, Sparkles } from 'lucide-react'
 
 const STATUS_BADGE = {
   DRAFT: 'bg-slate-100 text-slate-700',
@@ -265,10 +265,181 @@ function ReceiveModal({ order, onClose, onSaved }) {
   )
 }
 
+function GenerateLowStockPOModal({ onClose, onSaved }) {
+  const [suppliers, setSuppliers] = useState([])
+  const [suggestions, setSuggestions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ supplierId: '', expectedDate: '', notes: '', selections: {} })
+
+  useEffect(() => {
+    Promise.all([
+      suppliersApi.getAll({ includeInactive: false }),
+      purchaseOrdersApi.getReorderSuggestions(),
+    ]).then(([s, r]) => {
+      const list = r.data ?? []
+      setSuppliers(s.data ?? [])
+      setSuggestions(list)
+      setForm((prev) => ({
+        ...prev,
+        selections: Object.fromEntries(list.map((item) => [
+          item.productId,
+          { selected: true, quantity: String(item.suggestedOrderQuantity) },
+        ])),
+      }))
+    }).catch(() => toast.error('Failed to load low-stock suggestions'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const setSelection = (productId, patch) => {
+    setForm((prev) => ({
+      ...prev,
+      selections: {
+        ...prev.selections,
+        [productId]: { ...(prev.selections[productId] ?? { selected: false, quantity: '' }), ...patch },
+      },
+    }))
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const selectedItems = suggestions
+      .map((s) => ({ productId: s.productId, ...(form.selections[s.productId] ?? {}) }))
+      .filter((i) => i.selected)
+      .map((i) => ({ productId: i.productId, quantity: parseInt(i.quantity || '0') }))
+      .filter((i) => i.quantity > 0)
+
+    if (!form.supplierId) {
+      toast.error('Select a supplier')
+      return
+    }
+    if (selectedItems.length === 0) {
+      toast.error('Select at least one low-stock item')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await purchaseOrdersApi.generateFromLowStock({
+        supplierId: parseInt(form.supplierId),
+        expectedDate: form.expectedDate || null,
+        notes: form.notes || null,
+        items: selectedItems,
+      })
+      toast.success('Draft PO generated from low-stock list')
+      onSaved()
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? 'Failed to generate draft PO')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-base font-semibold">Generate Draft PO from Low Stock</h2>
+          <button onClick={onClose} className="press-feedback text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        </div>
+        {loading ? (
+          <div className="p-8 text-center text-slate-400 text-sm">Loading suggestions...</div>
+        ) : suggestions.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-slate-500 text-sm">No low-stock suggestions available right now.</p>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Supplier *</label>
+                <select
+                  required
+                  value={form.supplierId}
+                  onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                >
+                  <option value="">Select supplier...</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Expected Date</label>
+                <input
+                  type="date"
+                  value={form.expectedDate}
+                  onChange={(e) => setForm((f) => ({ ...f, expectedDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+              <input
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                placeholder="Optional note for generated draft PO"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Suggested Items</p>
+              {suggestions.map((s) => {
+                const selection = form.selections[s.productId] ?? { selected: false, quantity: '' }
+                return (
+                  <div key={s.productId} className="grid grid-cols-12 gap-2 items-end border border-slate-100 rounded-lg p-3">
+                    <div className="col-span-1">
+                      <input
+                        type="checkbox"
+                        checked={selection.selected}
+                        onChange={(e) => setSelection(s.productId, { selected: e.target.checked })}
+                      />
+                    </div>
+                    <div className="col-span-6">
+                      <p className="text-sm font-medium text-slate-900">{s.productName}</p>
+                      <p className="text-xs text-slate-500">
+                        Stock: {s.currentStock} | Threshold: {s.lowStockThreshold}
+                      </p>
+                    </div>
+                    <div className="col-span-3">
+                      <p className="text-xs text-slate-500 mb-1">Est. Unit Cost</p>
+                      <p className="text-sm text-slate-700">{s.estimatedUnitCost != null ? formatCurrency(s.estimatedUnitCost) : '—'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs text-slate-500 mb-1">Order Qty</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={selection.quantity}
+                        onChange={(e) => setSelection(s.productId, { quantity: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={onClose} className="press-feedback px-4 py-2 text-sm text-slate-600">Cancel</button>
+              <button disabled={saving} type="submit"
+                className="press-feedback px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm rounded-lg disabled:opacity-60">
+                {saving ? 'Generating...' : 'Generate Draft PO'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [showGenerateLowStock, setShowGenerateLowStock] = useState(false)
   const [receiveOrder, setReceiveOrder] = useState(null)
 
   const fetchOrders = useCallback(async () => {
@@ -302,12 +473,20 @@ export default function PurchaseOrdersPage() {
           <h1 className="text-xl font-semibold text-slate-900">Purchase Orders</h1>
           <p className="text-sm text-slate-500 mt-0.5">Create, approve, and receive supplier orders</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="press-feedback inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg"
-        >
-          <Plus size={14} /> New Purchase Order
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGenerateLowStock(true)}
+            className="press-feedback inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm rounded-lg"
+          >
+            <Sparkles size={14} /> Generate from Low Stock
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="press-feedback inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg"
+          >
+            <Plus size={14} /> New Purchase Order
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -362,6 +541,12 @@ export default function PurchaseOrdersPage() {
       </div>
 
       {showCreate && <CreatePOModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); fetchOrders() }} />}
+      {showGenerateLowStock && (
+        <GenerateLowStockPOModal
+          onClose={() => setShowGenerateLowStock(false)}
+          onSaved={() => { setShowGenerateLowStock(false); fetchOrders() }}
+        />
+      )}
       {receiveOrder && <ReceiveModal order={receiveOrder} onClose={() => setReceiveOrder(null)} onSaved={() => { setReceiveOrder(null); fetchOrders() }} />}
     </div>
   )
