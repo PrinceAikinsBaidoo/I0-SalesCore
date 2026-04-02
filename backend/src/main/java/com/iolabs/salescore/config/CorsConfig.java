@@ -24,8 +24,15 @@ public class CorsConfig {
                 .map(String::trim)
                 .filter(StringUtils::hasText)
                 .toList();
-        List<String> origins = parsed.isEmpty() ? List.of("http://localhost:5173") : parsed;
-        config.setAllowedOrigins(origins);
+
+        boolean isWildcard = parsed.isEmpty() || parsed.contains("*");
+        if (isWildcard) {
+            // setAllowedOriginPatterns supports wildcard + credentials (setAllowedOrigins("*") does not)
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            config.setAllowedOrigins(parsed);
+        }
+
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
