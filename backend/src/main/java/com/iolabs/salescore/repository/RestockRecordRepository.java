@@ -16,37 +16,37 @@ public interface RestockRecordRepository extends JpaRepository<RestockRecord, Lo
 
     @Query(value = """
         SELECT r FROM RestockRecord r
-        WHERE (:productId IS NULL OR r.product.id = :productId)
-          AND (:supplierId IS NULL OR r.supplier.id = :supplierId)
+        WHERE (COALESCE(:productId, r.product.id) = r.product.id)
+          AND (COALESCE(:supplierId, r.supplier.id) = r.supplier.id)
     """,
     countQuery = """
         SELECT COUNT(r) FROM RestockRecord r
-        WHERE (:productId IS NULL OR r.product.id = :productId)
-          AND (:supplierId IS NULL OR r.supplier.id = :supplierId)
+        WHERE (COALESCE(:productId, r.product.id) = r.product.id)
+          AND (COALESCE(:supplierId, r.supplier.id) = r.supplier.id)
     """)
     Page<RestockRecord> findHistory(Long productId, Long supplierId, Pageable pageable);
 
     @Query("""
         SELECT COUNT(DISTINCT r.supplier.id)
         FROM RestockRecord r
-        WHERE (:from IS NULL OR r.createdAt >= :from)
-          AND (:to IS NULL OR r.createdAt <= :to)
+        WHERE (r.createdAt >= COALESCE(:from, r.createdAt))
+          AND (r.createdAt <= COALESCE(:to, r.createdAt))
     """)
     Long countDistinctSuppliers(Instant from, Instant to);
 
     @Query("""
         SELECT COALESCE(SUM(r.quantity), 0)
         FROM RestockRecord r
-        WHERE (:from IS NULL OR r.createdAt >= :from)
-          AND (:to IS NULL OR r.createdAt <= :to)
+        WHERE (r.createdAt >= COALESCE(:from, r.createdAt))
+          AND (r.createdAt <= COALESCE(:to, r.createdAt))
     """)
     Long sumRestockedQuantity(Instant from, Instant to);
 
     @Query("""
         SELECT COALESCE(SUM(COALESCE(r.unitCost, 0) * r.quantity), 0)
         FROM RestockRecord r
-        WHERE (:from IS NULL OR r.createdAt >= :from)
-          AND (:to IS NULL OR r.createdAt <= :to)
+        WHERE (r.createdAt >= COALESCE(:from, r.createdAt))
+          AND (r.createdAt <= COALESCE(:to, r.createdAt))
     """)
     BigDecimal sumRestockedValue(Instant from, Instant to);
 
@@ -54,8 +54,8 @@ public interface RestockRecordRepository extends JpaRepository<RestockRecord, Lo
         SELECT r.supplier.id, r.supplier.name, COUNT(r), SUM(r.quantity),
                COALESCE(SUM(COALESCE(r.unitCost, 0) * r.quantity), 0), MAX(r.createdAt)
         FROM RestockRecord r
-        WHERE (:from IS NULL OR r.createdAt >= :from)
-          AND (:to IS NULL OR r.createdAt <= :to)
+        WHERE (r.createdAt >= COALESCE(:from, r.createdAt))
+          AND (r.createdAt <= COALESCE(:to, r.createdAt))
         GROUP BY r.supplier.id, r.supplier.name
         ORDER BY SUM(r.quantity) DESC
     """)

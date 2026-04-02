@@ -20,18 +20,20 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     boolean existsByEmail(String email);
 
     @Query(value = """
-        SELECT c FROM Customer c
-        WHERE :search IS NULL
-           OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
-           OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%'))
-           OR c.phone LIKE CONCAT('%', :search, '%')
+        SELECT c.* FROM customers c
+        WHERE CAST(:search AS text) IS NULL
+           OR LOWER(c.name) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+           OR LOWER(c.email) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+           OR c.phone LIKE CONCAT('%', CAST(:search AS text), '%')
+        ORDER BY c.name
     """,
     countQuery = """
-        SELECT COUNT(c) FROM Customer c
-        WHERE :search IS NULL
-           OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
-           OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%'))
-           OR c.phone LIKE CONCAT('%', :search, '%')
-    """)
+        SELECT COUNT(c.id) FROM customers c
+        WHERE CAST(:search AS text) IS NULL
+           OR LOWER(c.name) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+           OR LOWER(c.email) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+           OR c.phone LIKE CONCAT('%', CAST(:search AS text), '%')
+    """,
+    nativeQuery = true)
     Page<Customer> searchCustomers(@Param("search") String search, Pageable pageable);
 }

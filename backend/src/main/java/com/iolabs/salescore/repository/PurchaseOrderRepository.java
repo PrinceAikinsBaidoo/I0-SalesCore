@@ -27,8 +27,8 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
         LEFT JOIN FETCH po.approvedBy
         LEFT JOIN FETCH po.items i
         LEFT JOIN FETCH i.product
-        WHERE (:supplierId IS NULL OR po.supplier.id = :supplierId)
-          AND (:status IS NULL OR po.status = :status)
+        WHERE (COALESCE(:supplierId, po.supplier.id) = po.supplier.id)
+          AND (COALESCE(:status, po.status) = po.status)
         ORDER BY po.createdAt DESC
     """)
     List<PurchaseOrder> findAllWithFilters(Long supplierId, PurchaseOrder.Status status);
@@ -40,8 +40,8 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
         LEFT JOIN FETCH po.approvedBy
         LEFT JOIN FETCH po.items i
         LEFT JOIN FETCH i.product
-        WHERE (:supplierId IS NULL OR po.supplier.id = :supplierId)
-          AND (:status IS NULL OR po.status = :status)
+        WHERE (COALESCE(:supplierId, po.supplier.id) = po.supplier.id)
+          AND (COALESCE(:status, po.status) = po.status)
           AND po.expectedDate IS NOT NULL
           AND po.expectedDate < :today
           AND po.status IN :openStatuses

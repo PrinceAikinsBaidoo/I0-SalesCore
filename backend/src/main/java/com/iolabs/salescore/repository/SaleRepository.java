@@ -17,9 +17,9 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     @Query("""
         SELECT s FROM Sale s
-        WHERE (:from IS NULL OR s.createdAt >= :from)
-        AND (:to IS NULL OR s.createdAt <= :to)
-        AND (:userId IS NULL OR s.user.id = :userId)
+        WHERE (s.createdAt >= COALESCE(:from, s.createdAt))
+        AND (s.createdAt <= COALESCE(:to, s.createdAt))
+        AND (COALESCE(:userId, s.user.id) = s.user.id)
     """)
     Page<Sale> findSales(Instant from, Instant to, Long userId, Pageable pageable);
 

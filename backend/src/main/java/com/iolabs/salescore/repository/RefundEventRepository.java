@@ -33,20 +33,20 @@ public interface RefundEventRepository extends JpaRepository<RefundEvent, Long> 
         JOIN r.saleItem si
         JOIN r.product p
         JOIN r.refundedBy u
-        WHERE (:saleId IS NULL OR s.id = :saleId)
-          AND (:userId IS NULL OR u.id = :userId)
-          AND (:from IS NULL OR r.createdAt >= :from)
-          AND (:to IS NULL OR r.createdAt <= :to)
+        WHERE (COALESCE(:saleId, s.id) = s.id)
+          AND (COALESCE(:userId, u.id) = u.id)
+          AND (r.createdAt >= COALESCE(:from, r.createdAt))
+          AND (r.createdAt <= COALESCE(:to, r.createdAt))
     """,
     countQuery = """
         SELECT COUNT(r)
         FROM RefundEvent r
         JOIN r.sale s
         JOIN r.refundedBy u
-        WHERE (:saleId IS NULL OR s.id = :saleId)
-          AND (:userId IS NULL OR u.id = :userId)
-          AND (:from IS NULL OR r.createdAt >= :from)
-          AND (:to IS NULL OR r.createdAt <= :to)
+        WHERE (COALESCE(:saleId, s.id) = s.id)
+          AND (COALESCE(:userId, u.id) = u.id)
+          AND (r.createdAt >= COALESCE(:from, r.createdAt))
+          AND (r.createdAt <= COALESCE(:to, r.createdAt))
     """)
     Page<RefundEventResponse> findHistory(Long saleId, Long userId, Instant from, Instant to, Pageable pageable);
 }

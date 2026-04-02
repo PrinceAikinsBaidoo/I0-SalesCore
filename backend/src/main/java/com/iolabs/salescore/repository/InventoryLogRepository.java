@@ -14,8 +14,8 @@ public interface InventoryLogRepository extends JpaRepository<InventoryLog, Long
 
     @Query("""
         SELECT l FROM InventoryLog l
-        WHERE (:productId IS NULL OR l.product.id = :productId)
-        AND (:type IS NULL OR l.adjustmentType = :type)
+        WHERE (COALESCE(:productId, l.product.id) = l.product.id)
+        AND (COALESCE(:type, l.adjustmentType) = l.adjustmentType)
         ORDER BY l.createdAt DESC
     """)
     Page<InventoryLog> findLogs(Long productId, InventoryLog.AdjustmentType type, Pageable pageable);
