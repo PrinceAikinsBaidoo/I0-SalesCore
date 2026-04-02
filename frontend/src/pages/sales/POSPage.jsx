@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { CartProvider, useCart } from '@/contexts/CartContext'
 import { productsApi } from '@/api/products'
 import { customersApi } from '@/api/customers'
@@ -6,25 +6,81 @@ import { salesApi } from '@/api/sales'
 import { formatCurrency } from '@/utils/format'
 import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
+import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import {
   Search, Trash2, Plus, Minus, ShoppingCart,
-  CreditCard, Banknote, Smartphone, User, X, CheckCircle, Printer
+  CreditCard, Banknote, Smartphone, User, X, CheckCircle, Printer, ScanBarcode, Camera
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useRef as useReactRef } from 'react'
 
-// ---- Payment Modal ----
-function PaymentModal({ total, onClose, onSuccess }) {
+// ─── Paystack helper ────────────────────────────────────────────────────────
+const PAYSTACK_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ?? ''
+
+function openPaystack({ email, amount, onSuccess, onClose }) {
+  if (!PAYSTACK_KEY) {
+    toast.error('Paystack public key not configured (VITE_PAYSTACK_PUBLIC_KEY).')
+    return
+  }
+  // Paystack expects amount in kobo/pesewas (smallest unit)
+  const amountInPesewas = Math.round(amount * 100)
+  const reference = `IO-${Date.now()}`
+
+  // Dynamically load Paystack inline JS if not already present
+  const load = () => {
+    const handler = window.PaystackPop.setup({
+      key: PAYSTACK_KEY,
+      email: email || 'guest@iolabs.pos',
+      amount: amountInPesewas,
+      currency: 'GHS',
+      ref: reference,
+      label: 'I0 SalesCore',
+      onClose,
+      callback: (response) => onSuccess(response.reference),
+    })
+    handler.openIframe()
+  }
+
+  if (window.PaystackPop) {
+    load()
+  } else {
+    const script = document.createElement('script')
+    script.src = 'https://js.paystack.co/v2/inline.js'
+    script.onload = load
+    script.onerror = () => toast.error('Could not load Paystack. Check your internet connection.')
+    document.head.appendChild(script)
+  }
+}
+
+// ─── Payment Modal ───────────────────────────────────────────────────────────
+function PaymentModal({ total, customer, onClose, onSuccess }) {
   const [method, setMethod] = useState('CASH')
   const [amountPaid, setAmountPaid] = useState(total.toFixed(2))
   const [loading, setLoading] = useState(false)
   const change = Math.max(0, parseFloat(amountPaid || 0) - total)
 
   const methods = [
-    { id: 'CASH', label: 'Cash', icon: Banknote },
-    { id: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone },
-    { id: 'CARD', label: 'Card', icon: CreditCard },
+    { id: 'CASH',         label: 'Cash',         icon: Banknote,    online: false },
+    { id: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone,  online: true  },
+    { id: 'CARD',         label: 'Card',         icon: CreditCard,  online: true  },
   ]
+
+  const handleConfirm = () => {
+    const isOnline = methods.find(m => m.id === method)?.online
+    if (isOnline) {
+      setLoading(true)
+      openPaystack({
+        email: customer?.email,
+        amount: total,
+        onSuccess: (ref) => {
+          setLoading(false)
+          onSuccess(method, total, 0, ref)
+        },
+        onClose: () => setLoading(false),
+      })
+    } else {
+      onSuccess(method, parseFloat(amountPaid), change, null)
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
@@ -45,7 +101,7 @@ function PaymentModal({ total, onClose, onSuccess }) {
           <div>
             <p className="text-xs font-medium text-slate-600 mb-2">Payment Method</p>
             <div className="grid grid-cols-3 gap-2">
-              {methods.map(({ id, label, icon: Icon }) => (
+              {methods.map(({ id, label, icon: Icon, online }) => (
                 <button
                   key={id}
                   onClick={() => setMethod(id)}
@@ -58,36 +114,52 @@ function PaymentModal({ total, onClose, onSuccess }) {
                 >
                   <Icon size={18} />
                   {label}
+                  {online && (
+                    <span className={cn('text-[9px] rounded-full px-1.5 py-0.5 font-semibold',
+                      method === id ? 'bg-blue-100 text-blue-500' : 'bg-slate-100 text-slate-400')}>
+                      Paystack
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Amount paid */}
-          <div>
-            <label className="text-xs font-medium text-slate-600 block mb-1">Amount Tendered</label>
-            <input
-              type="number" step="0.01" min={total}
-              value={amountPaid}
-              onChange={e => setAmountPaid(e.target.value)}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Change */}
+          {/* Amount paid — only for cash */}
           {method === 'CASH' && (
-            <div className="flex items-center justify-between bg-green-50 rounded-xl px-4 py-3">
-              <span className="text-sm font-medium text-green-700">Change</span>
-              <span className="text-lg font-bold text-green-700">{formatCurrency(change)}</span>
+            <>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Amount Tendered</label>
+                <input
+                  type="number" step="0.01" min={total}
+                  value={amountPaid}
+                  onChange={e => setAmountPaid(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-between bg-green-50 rounded-xl px-4 py-3">
+                <span className="text-sm font-medium text-green-700">Change</span>
+                <span className="text-lg font-bold text-green-700">{formatCurrency(change)}</span>
+              </div>
+            </>
+          )}
+
+          {/* Paystack notice */}
+          {method !== 'CASH' && (
+            <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-4 py-3">
+              <CreditCard size={16} className="text-blue-500 flex-shrink-0" />
+              <p className="text-xs text-blue-700">
+                You will be redirected to Paystack to complete the payment securely.
+              </p>
             </div>
           )}
 
           <button
-            disabled={loading || parseFloat(amountPaid || 0) < total}
-            onClick={() => onSuccess(method, parseFloat(amountPaid), change)}
+            disabled={loading || (method === 'CASH' && parseFloat(amountPaid || 0) < total)}
+            onClick={handleConfirm}
             className="press-feedback w-full py-3 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors"
           >
-            {loading ? 'Processing…' : 'Confirm Payment'}
+            {loading ? 'Opening Paystack…' : method === 'CASH' ? 'Confirm Payment' : `Pay ${formatCurrency(total)} via Paystack`}
           </button>
         </div>
       </div>
@@ -95,7 +167,7 @@ function PaymentModal({ total, onClose, onSuccess }) {
   )
 }
 
-// ---- Success Modal ----
+// ─── Success Modal ────────────────────────────────────────────────────────────
 function SuccessModal({ sale, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -121,7 +193,7 @@ function SuccessModal({ sale, onClose }) {
   )
 }
 
-// ---- Main POS ----
+// ─── Main POS ─────────────────────────────────────────────────────────────────
 function POSContent() {
   const { cart, dispatch, subtotal, total } = useCart()
   const [search, setSearch] = useState('')
@@ -130,23 +202,94 @@ function POSContent() {
   const [customerSearch, setCustomerSearch] = useState('')
   const [customerResults, setCustomerResults] = useState([])
   const [showPayment, setShowPayment] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
   const [completedSale, setCompletedSale] = useState(null)
   const [processing, setProcessing] = useState(false)
   const searchRef = useRef(null)
   const debouncedSearch = useDebounce(search, 300)
   const debouncedCustomer = useDebounce(customerSearch, 300)
 
+  // -------------------------------------------------------------------
+  // Hardware USB/Bluetooth barcode scanner support.
+  // Hardware scanners type very fast (< 30ms between chars) and end
+  // with Enter. We detect this pattern and trigger a lookup directly.
+  // -------------------------------------------------------------------
+  const hwBuffer = useRef('')
+  const hwTimer = useRef(null)
+  const SCANNER_THRESHOLD_MS = 30
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      // Ignore if user is typing in an input / textarea that isn't the search bar
+      const tag = document.activeElement?.tagName
+      const isOtherInput = (tag === 'INPUT' || tag === 'TEXTAREA') && document.activeElement !== searchRef.current
+      if (isOtherInput) return
+
+      if (e.key === 'Enter') {
+        clearTimeout(hwTimer.current)
+        const code = hwBuffer.current.trim()
+        hwBuffer.current = ''
+        if (code.length >= 4) {
+          // Hardware scanner fired — bypass debounce
+          e.preventDefault()
+          handleBarcodeInput(code)
+        }
+        return
+      }
+
+      if (e.key.length === 1) { // printable character
+        clearTimeout(hwTimer.current)
+        hwBuffer.current += e.key
+        hwTimer.current = setTimeout(() => {
+          // User typed slowly — not a scanner, clear buffer
+          hwBuffer.current = ''
+        }, SCANNER_THRESHOLD_MS)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [])
+
+  const handleBarcodeInput = useCallback((code) => {
+    setSearch(code) // show scanned code in the search bar
+    setSearching(true)
+    productsApi.getByBarcode(code)
+      .then(r => {
+        const product = r.data
+        if (product) {
+          addProduct(product)
+          setSearch('')
+          setSearchResults([])
+          toast.success(`Added: ${product.name}`)
+        } else {
+          toast.warning('No product found for barcode: ' + code)
+        }
+      })
+      .catch(() => {
+        toast.warning('No product found for barcode: ' + code)
+      })
+      .finally(() => setSearching(false))
+  }, [])
+
+  // Camera scan callback
+  const handleCameraScan = useCallback((code) => {
+    setShowCamera(false)
+    handleBarcodeInput(code)
+  }, [handleBarcodeInput])
+
   useEffect(() => { searchRef.current?.focus() }, [])
 
-  // Product search
+  // Product text search
   useEffect(() => {
     if (!debouncedSearch) { setSearchResults([]); return }
     setSearching(true)
-    const isBarcodeSearch = /^\d+$/.test(debouncedSearch) && debouncedSearch.length >= 6
-    const request = isBarcodeSearch
-      ? productsApi.getByBarcode(debouncedSearch).then(r => ({ data: { content: [r.data] } })).catch(() => ({ data: { content: [] } }))
+    const isBarcode = /^\d+$/.test(debouncedSearch) && debouncedSearch.length >= 6
+    const req = isBarcode
+      ? productsApi.getByBarcode(debouncedSearch)
+          .then(r => ({ data: { content: [r.data].filter(Boolean) } }))
+          .catch(() => ({ data: { content: [] } }))
       : productsApi.getAll({ search: debouncedSearch, size: 8 })
-    request.then(r => setSearchResults(r.data.content ?? []))
+    req.then(r => setSearchResults(r.data.content ?? []))
       .catch(() => setSearchResults([]))
       .finally(() => setSearching(false))
   }, [debouncedSearch])
@@ -167,7 +310,7 @@ function POSContent() {
     searchRef.current?.focus()
   }
 
-  const handleCheckout = async (method, amountPaid) => {
+  const handleCheckout = async (method, amountPaid, change, paystackRef) => {
     setProcessing(true)
     try {
       const payload = {
@@ -181,11 +324,12 @@ function POSContent() {
         taxAmount: 0,
         paymentMethod: method,
         amountPaid,
-        notes: null,
+        notes: paystackRef ? `Paystack ref: ${paystackRef}` : null,
       }
       const { data } = await salesApi.create(payload)
       setShowPayment(false)
       setCompletedSale(data)
+      dispatch({ type: 'CLEAR' })
     } catch (err) {
       toast.error(err.response?.data?.message ?? 'Sale failed')
     } finally {
@@ -197,16 +341,36 @@ function POSContent() {
     <div className="flex h-screen bg-slate-100 gap-0">
       {/* Left — Product search */}
       <div className="flex-1 flex flex-col p-4 gap-3">
-        {/* Search bar */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-            placeholder="Search products or scan barcode…"
-          />
+        {/* Search bar + camera button */}
+        <div className="relative flex gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+              placeholder="Search products, type barcode, or scan…"
+            />
+            {searching && (
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
+          {/* Camera scan button */}
+          <button
+            onClick={() => setShowCamera(true)}
+            className="press-feedback flex items-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+            title="Scan barcode with camera"
+          >
+            <Camera size={16} />
+            <span className="hidden sm:inline">Scan</span>
+          </button>
+        </div>
+
+        {/* Hardware scanner hint */}
+        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <ScanBarcode size={12} />
+          <span>USB/Bluetooth scanner: just scan — it will auto-add the product</span>
         </div>
 
         {/* Search results grid */}
@@ -241,7 +405,7 @@ function POSContent() {
         ) : !search ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2">
             <Search size={32} className="opacity-30" />
-            <p className="text-sm">Search for products to add to cart</p>
+            <p className="text-sm">Search or scan a product barcode to add it to the cart</p>
           </div>
         ) : null}
       </div>
@@ -382,18 +546,24 @@ function POSContent() {
         </div>
       </div>
 
+      {/* Modals */}
+      {showCamera && (
+        <BarcodeScannerModal onScan={handleCameraScan} onClose={() => setShowCamera(false)} />
+      )}
+
       {showPayment && (
         <PaymentModal
           total={total}
+          customer={cart.customer}
           onClose={() => setShowPayment(false)}
-          onSuccess={(method, amountPaid) => handleCheckout(method, amountPaid)}
+          onSuccess={(method, amountPaid, change, ref) => handleCheckout(method, amountPaid, change, ref)}
         />
       )}
 
       {completedSale && (
         <SuccessModal
           sale={completedSale}
-          onClose={() => { setCompletedSale(null); dispatch({ type: 'CLEAR' }) }}
+          onClose={() => setCompletedSale(null)}
         />
       )}
     </div>
