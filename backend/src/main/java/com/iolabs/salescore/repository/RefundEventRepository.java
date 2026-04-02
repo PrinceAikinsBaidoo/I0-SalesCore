@@ -13,7 +13,7 @@ import java.time.Instant;
 @Repository
 public interface RefundEventRepository extends JpaRepository<RefundEvent, Long> {
 
-    @Query("""
+    @Query(value = """
         SELECT new com.iolabs.salescore.dto.response.RefundEventResponse(
             r.id,
             s.id,
@@ -32,6 +32,16 @@ public interface RefundEventRepository extends JpaRepository<RefundEvent, Long> 
         JOIN r.sale s
         JOIN r.saleItem si
         JOIN r.product p
+        JOIN r.refundedBy u
+        WHERE (:saleId IS NULL OR s.id = :saleId)
+          AND (:userId IS NULL OR u.id = :userId)
+          AND (:from IS NULL OR r.createdAt >= :from)
+          AND (:to IS NULL OR r.createdAt <= :to)
+    """,
+    countQuery = """
+        SELECT COUNT(r)
+        FROM RefundEvent r
+        JOIN r.sale s
         JOIN r.refundedBy u
         WHERE (:saleId IS NULL OR s.id = :saleId)
           AND (:userId IS NULL OR u.id = :userId)

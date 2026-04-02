@@ -24,7 +24,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
 
     public Page<Product> getProducts(String search, Long categoryId, Pageable pageable) {
-        return productRepository.searchProducts(search, categoryId, pageable);
+        return productRepository.searchProductsNative(search, categoryId, pageable);
     }
 
     public Product getById(Long id) {
@@ -78,10 +78,13 @@ public class ProductService {
         product.setImageUrl(req.imageUrl());
         if (req.quantity() != null) product.setQuantity(req.quantity());
         if (req.lowStockThreshold() != null) product.setLowStockThreshold(req.lowStockThreshold());
+        // Explicitly set or clear category based on whether categoryId is provided
         if (req.categoryId() != null) {
             Category category = categoryRepository.findById(req.categoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Category", req.categoryId()));
             product.setCategory(category);
+        } else {
+            product.setCategory(null);
         }
         return product;
     }

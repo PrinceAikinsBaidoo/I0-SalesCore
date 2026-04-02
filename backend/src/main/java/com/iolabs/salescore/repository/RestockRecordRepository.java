@@ -16,9 +16,6 @@ public interface RestockRecordRepository extends JpaRepository<RestockRecord, Lo
 
     @Query(value = """
         SELECT r FROM RestockRecord r
-        LEFT JOIN FETCH r.product
-        LEFT JOIN FETCH r.supplier
-        LEFT JOIN FETCH r.restockedBy
         WHERE (:productId IS NULL OR r.product.id = :productId)
           AND (:supplierId IS NULL OR r.supplier.id = :supplierId)
     """,

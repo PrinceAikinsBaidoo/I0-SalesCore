@@ -17,8 +17,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     @Query("""
         SELECT s FROM Sale s
-        LEFT JOIN FETCH s.user
-        LEFT JOIN FETCH s.customer
         WHERE (:from IS NULL OR s.createdAt >= :from)
         AND (:to IS NULL OR s.createdAt <= :to)
         AND (:userId IS NULL OR s.user.id = :userId)

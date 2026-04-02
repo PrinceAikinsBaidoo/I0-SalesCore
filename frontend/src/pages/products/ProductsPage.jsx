@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { Plus, Search, Edit2, Trash2, AlertTriangle, X, Package } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const ROLES_CAN_EDIT = ['ADMIN', 'MANAGER']
 
 function ProductFormModal({ product, categories, onClose, onSaved }) {
   const isEdit = !!product

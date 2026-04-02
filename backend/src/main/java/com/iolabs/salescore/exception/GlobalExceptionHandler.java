@@ -51,8 +51,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
         log.error("Unexpected error", ex);
+        // DEV ONLY: expose real cause for debugging — revert before release
+        String cause = ex.getClass().getSimpleName() + ": " + ex.getMessage()
+                + (ex.getCause() != null ? " | caused by: " + ex.getCause().getMessage() : "");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(500, "An unexpected error occurred"));
+                .body(new ErrorResponse(500, cause));
     }
 
     public record ErrorResponse(int status, String message, Instant timestamp) {

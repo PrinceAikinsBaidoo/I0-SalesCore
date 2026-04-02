@@ -14,8 +14,6 @@ public interface InventoryLogRepository extends JpaRepository<InventoryLog, Long
 
     @Query("""
         SELECT l FROM InventoryLog l
-        LEFT JOIN FETCH l.product
-        LEFT JOIN FETCH l.user
         WHERE (:productId IS NULL OR l.product.id = :productId)
         AND (:type IS NULL OR l.adjustmentType = :type)
         ORDER BY l.createdAt DESC
