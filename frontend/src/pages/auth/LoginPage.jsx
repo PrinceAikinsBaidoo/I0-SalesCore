@@ -1,13 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Toaster, toast } from 'sonner'
+import { pingBackend } from '@/api/client'
+import { Loader2, Wifi } from 'lucide-react'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ username: '', password: '' })
+
+  // Wake up the Render backend as soon as the login page mounts.
+  // Render free tier sleeps after inactivity — this gives it a head start
+  // so login is fast the moment the user submits the form.
+  const [warming, setWarming] = useState(true)
+  useEffect(() => {
+    pingBackend()
+    // Give the backend ~4 seconds of warming time, then remove the banner
+    // regardless of whether it replied (we don't block on it).
+    const t = setTimeout(() => setWarming(false), 4000)
+    return () => clearTimeout(t)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -18,7 +32,14 @@ export default function LoginPage() {
       if (role === 'CASHIER') navigate('/pos')
       else navigate('/dashboard')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Invalid credentials')
+      if (err.isNetworkError || err.code === 'ECONNABORTED') {
+        toast.error(
+          'Server is starting up — this can take up to 60 seconds on first load. Please try again in a moment.',
+          { duration: 8000 }
+        )
+      } else {
+        toast.error(err.response?.data?.message || 'Invalid credentials')
+      }
     } finally {
       setLoading(false)
     }
@@ -37,6 +58,14 @@ export default function LoginPage() {
           <h1 className="text-white text-2xl font-semibold tracking-tight">I0 SalesCore</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your account</p>
         </div>
+
+        {/* Warm-up banner — shown briefly on first visit */}
+        {warming && (
+          <div className="flex items-center gap-2 bg-blue-900/40 border border-blue-700/50 text-blue-300 text-xs rounded-xl px-4 py-3 mb-4 animate-fade-in">
+            <Wifi size={13} className="flex-shrink-0 animate-pulse" />
+            <span>Connecting to server — ready in a few seconds…</span>
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
@@ -76,9 +105,14 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="press-feedback w-full py-2.5 px-4 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150"
+              className="press-feedback w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors duration-150"
             >
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Signing in…
+                </>
+              ) : 'Sign in'}
             </button>
           </form>
         </div>
