@@ -178,6 +178,17 @@ function PaymentModal({ total, customer, onClose, onSuccess }) {
 
 // ─── Success Modal ────────────────────────────────────────────────────────────
 function SuccessModal({ sale, onClose }) {
+  const receiptId = sale?.id ?? sale?.saleId ?? sale?.sale?.id
+
+  const openReceipt = () => {
+    if (!receiptId) {
+      toast.error('Receipt is not ready yet. Please refresh sales history and try again.')
+      return
+    }
+    window.open(`/receipt/${receiptId}`, '_blank')
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-fade-in p-8 text-center">
@@ -192,8 +203,11 @@ function SuccessModal({ sale, onClose }) {
             className="press-feedback flex-1 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
             New Sale
           </button>
-          <button onClick={() => { window.open(`/receipt/${sale.id}`, '_blank'); onClose() }}
-            className="press-feedback flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-500 text-white text-sm font-medium rounded-xl hover:bg-blue-600 transition-colors">
+          <button
+            onClick={openReceipt}
+            disabled={!receiptId}
+            className="press-feedback flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-500 text-white text-sm font-medium rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
             <Printer size={14} /> Receipt
           </button>
         </div>
@@ -336,8 +350,12 @@ function POSContent() {
         referenceNumber: paystackRef ?? null,
       }
       const { data } = await salesApi.create(payload)
+      const normalizedSale = data?.id ? data : (data?.sale?.id ? data.sale : data)
+      if (!normalizedSale?.id) {
+        toast.warning('Sale completed, but receipt ID was not returned. Check Sales/Reports.')
+      }
       setShowPayment(false)
-      setCompletedSale(data)
+      setCompletedSale(normalizedSale)
       dispatch({ type: 'CLEAR' })
     } catch (err) {
       toast.error(err.response?.data?.message ?? 'Sale failed')

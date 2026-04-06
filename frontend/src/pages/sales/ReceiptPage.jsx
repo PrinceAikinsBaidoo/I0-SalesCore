@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 
 export default function ReceiptPage() {
   const { id } = useParams()
+  const isValidId = /^\d+$/.test(String(id ?? ''))
   const navigate = useNavigate()
   const [sale, setSale] = useState(null)
   const [payments, setPayments] = useState([])
@@ -17,7 +18,7 @@ export default function ReceiptPage() {
   const [refundQty, setRefundQty] = useState({})
 
   const loadReceipt = async (currentId = id, silent = false) => {
-    if (!currentId) return
+    if (!currentId || !/^\d+$/.test(String(currentId))) return
     if (!silent) setLoading(true)
     try {
       const [saleRes, paymentsRes] = await Promise.all([
@@ -35,7 +36,11 @@ export default function ReceiptPage() {
   }
 
   useEffect(() => {
-    if (!id) return
+    if (!id || !isValidId) {
+      setError('Invalid receipt link')
+      setLoading(false)
+      return
+    }
     let active = true
 
     setLoading(true)
@@ -56,7 +61,7 @@ export default function ReceiptPage() {
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, isValidId])
 
   const paymentSummary = useMemo(() => {
     if (!payments.length) return null
