@@ -12,12 +12,20 @@ import java.util.List;
 @Repository
 public interface InventoryLogRepository extends JpaRepository<InventoryLog, Long> {
 
-    @Query("""
+    @Query(
+            value = """
         SELECT l FROM InventoryLog l
+        LEFT JOIN FETCH l.product
+        LEFT JOIN FETCH l.user
         WHERE (COALESCE(:productId, l.product.id) = l.product.id)
         AND (COALESCE(:type, l.adjustmentType) = l.adjustmentType)
-        ORDER BY l.createdAt DESC
-    """)
+    """,
+            countQuery = """
+        SELECT COUNT(l) FROM InventoryLog l
+        WHERE (COALESCE(:productId, l.product.id) = l.product.id)
+        AND (COALESCE(:type, l.adjustmentType) = l.adjustmentType)
+    """
+    )
     Page<InventoryLog> findLogs(Long productId, InventoryLog.AdjustmentType type, Pageable pageable);
 
     @Query("""
