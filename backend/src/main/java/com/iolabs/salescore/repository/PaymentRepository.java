@@ -20,6 +20,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             Instant createdAt
     );
 
+    boolean existsByReferenceNumber(String referenceNumber);
+
     @Query("SELECT p FROM Payment p LEFT JOIN FETCH p.sale ORDER BY p.id")
     List<Payment> findAllWithSale();
 }

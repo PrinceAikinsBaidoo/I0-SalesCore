@@ -8,6 +8,7 @@ Use this before calling the system “production ready” for a pilot or class d
 - [ ] Set strong PostgreSQL credentials; restrict DB network access.
 - [ ] Change the default seeded admin password (`admin` / `Admin@123`) immediately after first deploy.
 - [ ] Set `APP_CORS_ALLOWED_ORIGINS` to real front-end URLs only (no `*`).
+- [ ] If using CARD/MOBILE_MONEY, set `APP_PAYSTACK_SECRET_KEY` so backend verifies each Paystack reference.
 - [ ] Confirm `SPRING_PROFILES_ACTIVE=prod` so stack traces are not exposed in API errors.
 
 ## Deploy and operations

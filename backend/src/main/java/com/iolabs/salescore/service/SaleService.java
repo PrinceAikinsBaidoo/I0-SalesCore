@@ -38,6 +38,7 @@ public class SaleService {
     private final PaymentRepository paymentRepository;
     private final RefundEventRepository refundEventRepository;
     private final InventoryService inventoryService;
+    private final PaystackVerificationService paystackVerificationService;
 
     private static final AtomicInteger SEQ = new AtomicInteger(1);
 
@@ -130,10 +131,41 @@ public class SaleService {
         sale.setSubtotal(subtotal);
         sale.setTotalAmount(totalAmount);
 
+        Payment.PaymentMethod method;
+        try {
+            method = Payment.PaymentMethod.valueOf(request.paymentMethod().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid payment method: " + request.paymentMethod());
+        }
+
         BigDecimal amountPaid = request.amountPaid();
-        if (amountPaid.compareTo(totalAmount) < 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST,
-                    "Amount paid (" + amountPaid + ") is less than total (" + totalAmount + ")");
+        String referenceNumber = request.referenceNumber() == null ? null : request.referenceNumber().trim();
+        if (referenceNumber != null && referenceNumber.isBlank()) {
+            referenceNumber = null;
+        }
+
+        boolean isCash = method == Payment.PaymentMethod.CASH;
+        if (isCash) {
+            if (amountPaid.compareTo(totalAmount) < 0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "Amount paid (" + amountPaid + ") is less than total (" + totalAmount + ")");
+            }
+        } else {
+            if (amountPaid.compareTo(totalAmount) != 0) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "For " + method.name() + ", amount paid must match total (" + totalAmount + ")"
+                );
+            }
+            if (referenceNumber == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "Payment reference is required for " + method.name());
+            }
+            if (paymentRepository.existsByReferenceNumber(referenceNumber)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "This payment reference has already been used");
+            }
+            paystackVerificationService.verifySuccessfulCharge(referenceNumber, totalAmount);
         }
 
         Sale savedSale = saleRepository.save(sale);
@@ -144,19 +176,14 @@ public class SaleService {
             inventoryService.deductStock(product, itemReq.quantity(), user, savedSale.getId());
         }
 
-        // Record payment
-        Payment.PaymentMethod method;
-        try { method = Payment.PaymentMethod.valueOf(request.paymentMethod().toUpperCase()); }
-        catch (IllegalArgumentException e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid payment method: " + request.paymentMethod());
-        }
+        BigDecimal changeAmount = isCash ? amountPaid.subtract(totalAmount) : BigDecimal.ZERO;
 
         Payment payment = Payment.builder()
                 .sale(savedSale)
                 .paymentMethod(method)
                 .amountPaid(amountPaid)
-                .changeAmount(amountPaid.subtract(totalAmount))
-                .referenceNumber(request.referenceNumber())
+                .changeAmount(changeAmount)
+                .referenceNumber(referenceNumber)
                 .status(Payment.PaymentStatus.SUCCESS)
                 .build();
         paymentRepository.save(payment);

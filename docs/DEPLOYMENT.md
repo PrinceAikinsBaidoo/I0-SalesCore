@@ -20,6 +20,9 @@ Environment variables (see `backend/.env.example`):
 | `APP_JWT_SECRET` | JWT signing secret (long random string, 32+ characters) |
 | `APP_BOOTSTRAP_TOKEN` | Optional secret for first-admin bootstrap (see `MVP_CHECKLIST.md`) |
 | `APP_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins |
+| `APP_PAYSTACK_SECRET_KEY` | Required for backend Paystack verification of CARD/MOBILE_MONEY payments |
+| `APP_PAYSTACK_VERIFICATION_ENABLED` | Keep `true` in production (set `false` only for local/offline testing) |
+| `APP_PAYSTACK_EXPECTED_CURRENCY` | Expected Paystack transaction currency (default `GHS`) |
 
 ### Frontend
 

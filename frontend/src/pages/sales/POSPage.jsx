@@ -15,6 +15,14 @@ import { cn } from '@/lib/utils'
 
 // ─── Paystack helper ────────────────────────────────────────────────────────
 const PAYSTACK_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ?? ''
+const PAYSTACK_FALLBACK_EMAIL = import.meta.env.VITE_PAYSTACK_FALLBACK_EMAIL ?? 'payments@iosalescore.com'
+
+function resolvePaystackEmail(rawEmail) {
+  const email = String(rawEmail ?? '').trim()
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  if (isValid) return email
+  return PAYSTACK_FALLBACK_EMAIL
+}
 
 function openPaystack({ email, amount, onSuccess, onClose }) {
   if (!PAYSTACK_KEY) {
@@ -27,9 +35,10 @@ function openPaystack({ email, amount, onSuccess, onClose }) {
 
   // Dynamically load Paystack inline JS if not already present
   const load = () => {
+    const paystackEmail = resolvePaystackEmail(email)
     const handler = window.PaystackPop.setup({
       key: PAYSTACK_KEY,
-      email: email || 'guest@iolabs.pos',
+      email: paystackEmail,
       amount: amountInPesewas,
       currency: 'GHS',
       ref: reference,
@@ -310,7 +319,7 @@ function POSContent() {
     searchRef.current?.focus()
   }
 
-  const handleCheckout = async (method, amountPaid, change, paystackRef) => {
+  const handleCheckout = async (method, amountPaid, paystackRef) => {
     setProcessing(true)
     try {
       const payload = {
@@ -324,7 +333,7 @@ function POSContent() {
         taxAmount: 0,
         paymentMethod: method,
         amountPaid,
-        notes: paystackRef ? `Paystack ref: ${paystackRef}` : null,
+        referenceNumber: paystackRef ?? null,
       }
       const { data } = await salesApi.create(payload)
       setShowPayment(false)
@@ -556,7 +565,7 @@ function POSContent() {
           total={total}
           customer={cart.customer}
           onClose={() => setShowPayment(false)}
-          onSuccess={(method, amountPaid, change, ref) => handleCheckout(method, amountPaid, change, ref)}
+          onSuccess={(method, amountPaid, _change, ref) => handleCheckout(method, amountPaid, ref)}
         />
       )}
 
