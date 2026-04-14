@@ -1,10 +1,10 @@
 -- ============================================================
--- I0 SalesCore — Product Seed Data (10 Products with Images)
+-- I0 SalesCore — Product Seed Data (15 Products with Images)
 -- V7__seed_products.sql
 -- ============================================================
 -- Note: Flyway runs all migrations in order (V1–V7) on a fresh database.
 -- This migration depends on V2 categories being present.
--- Image URLs use Unsplash CDN (no API key required for direct photo URLs).
+-- Image URLs point to static files served by the frontend (see frontend/public/product-images/opt).
 -- ============================================================
 
 INSERT INTO products (
@@ -40,7 +40,7 @@ FROM (VALUES
         35,
         '6901210930208',
         '6.5" FHD+ display, 50MP camera, 5000mAh battery. Ideal for everyday smartphone use.',
-        'https://images.unsplash.com/photo-1610945415253-d7e0c7ea3c92?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/samsung-galaxy-a15.jpg',
         5
     ),
     -- 2. Wireless Earbuds
@@ -52,7 +52,7 @@ FROM (VALUES
         50,
         '6900000000011',
         'True wireless stereo earbuds with noise isolation, 6-hour playtime, charging case included.',
-        'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/wireless-earbuds.jpg',
         8
     ),
     -- 3. Voltic Water 1.5L
@@ -64,7 +64,7 @@ FROM (VALUES
         200,
         '6001032100302',
         'Purified drinking water. Refreshing and safe for all ages. 1.5 litre bottle.',
-        'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/voltic-water-1-5l.jpg',
         30
     ),
     -- 4. Alvaro Malt Drink 330ml
@@ -76,7 +76,7 @@ FROM (VALUES
         120,
         '5900822022498',
         'Premium non-alcoholic malt beverage with a rich, smooth flavour. Great chilled.',
-        'https://images.unsplash.com/photo-1551538827-9c037cb4f32a?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/alvaro-malt-330ml.jpg',
         20
     ),
     -- 5. Indomie Chicken Noodles
@@ -88,7 +88,7 @@ FROM (VALUES
         300,
         '8992388010009',
         'Quick-cook chicken-flavoured instant noodles. Ready in 3 minutes. Popular household staple.',
-        'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/indomie-chicken-noodles.jpg',
         40
     ),
     -- 6. Sunshine Bread Loaf
@@ -100,7 +100,7 @@ FROM (VALUES
         60,
         '6001000163018',
         'Soft, freshly baked sliced white bread. 700g loaf. Perfect for sandwiches and toast.',
-        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/sunshine-bread-loaf.jpg',
         10
     ),
     -- 7. Men's Classic Polo Shirt
@@ -112,7 +112,7 @@ FROM (VALUES
         80,
         '4006381333924',
         'Premium cotton polo shirt. Available in multiple colours. Comfortable and stylish for everyday wear.',
-        'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/mens-classic-polo.jpg',
         10
     ),
     -- 8. A4 Exercise Book 80 Leaves
@@ -124,7 +124,7 @@ FROM (VALUES
         150,
         '6001032400215',
         'Ruled A4 exercise book with 80 leaves (160 pages). Sturdy cover. Suitable for school and office.',
-        'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/a4-exercise-book.jpg',
         20
     ),
     -- 9. Dettol Original Bar Soap
@@ -136,7 +136,7 @@ FROM (VALUES
         100,
         '6285010054585',
         'Antibacterial bar soap that kills 99.9% of germs. Dermatologically tested. 120g bar.',
-        'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/dettol-original-soap.jpg',
         15
     ),
     -- 10. Electric Rice Cooker 1.8L
@@ -148,8 +148,68 @@ FROM (VALUES
         25,
         '6920001234567',
         'Automatic 1.8-litre electric rice cooker with steaming tray and keep-warm function. Easy to use.',
-        'https://images.unsplash.com/photo-1534483509719-3feaee7c30da?w=400&h=400&fit=crop&q=80',
+        '/product-images/opt/electric-rice-cooker-1-8l.jpg',
         4
+    ),
+    -- 11. USB Flash Drive 32GB
+    (
+        'USB Flash Drive 32GB',
+        'Electronics',
+        45.00,
+        28.00,
+        120,
+        '8400000000001',
+        'USB 3.0 flash drive for quick file transfer and backups. 32GB capacity.',
+        '/product-images/opt/usb-flash-drive-32gb.jpg',
+        20
+    ),
+    -- 12. Toothpaste Tube
+    (
+        'Pepsodent Toothpaste (100ml)',
+        'Health & Beauty',
+        18.00,
+        11.00,
+        90,
+        '8400000000002',
+        'Pepsodent toothpaste for daily oral care. Freshens breath and helps fight plaque.',
+        '/product-images/opt/toothpaste-tube.jpg',
+        15
+    ),
+    -- 13. Laundry Detergent
+    (
+        'Laundry Detergent Powder 1kg',
+        'Household',
+        65.00,
+        45.00,
+        60,
+        '8400000000003',
+        'All-purpose laundry detergent powder for hand-wash or machine wash. 1kg pack.',
+        '/product-images/opt/laundry-detergent.jpg',
+        10
+    ),
+    -- 14. Cooking Oil
+    (
+        'Cooking Oil 1L',
+        'Food',
+        55.00,
+        40.00,
+        70,
+        '8400000000004',
+        'Refined cooking oil suitable for frying and baking. 1 litre bottle.',
+        '/product-images/opt/cooking-oil-1l.jpg',
+        12
+    ),
+    -- 15. Soft Drink Bottle
+    (
+        'Soft Drink Bottle 500ml',
+        'Beverages',
+        10.00,
+        6.50,
+        150,
+        '8400000000005',
+        'Chilled bottled soft drink. 500ml.',
+        '/product-images/opt/soft-drink-bottle.jpg',
+        25
     )
 ) AS p(name, category_name, price, cost_price, quantity, barcode, description, image_url, low_stock_threshold)
 JOIN categories c ON c.name = p.category_name

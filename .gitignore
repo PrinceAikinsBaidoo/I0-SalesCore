@@ -45,3 +45,5 @@ frontend/dist-ssr/
 coverage/
 .cache/
 .eslintcache
+
+.vercel
