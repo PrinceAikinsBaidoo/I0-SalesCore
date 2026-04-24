@@ -5,6 +5,12 @@ spring:
   flyway:
     validate-on-migrate: true
 
+app:
+  cors:
+    # Deployed frontend (Vercel) calls the Render API cross-origin.
+    # Patterns are supported (e.g. https://*.vercel.app).
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://*.vercel.app}
+
 server:
   error:
     include-stacktrace: never

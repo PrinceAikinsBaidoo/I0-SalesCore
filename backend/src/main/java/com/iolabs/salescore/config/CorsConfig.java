@@ -26,9 +26,13 @@ public class CorsConfig {
                 .toList();
 
         boolean isWildcard = parsed.isEmpty() || parsed.contains("*");
+        boolean hasPattern = parsed.stream().anyMatch(o -> o.contains("*"));
         if (isWildcard) {
             // setAllowedOriginPatterns supports wildcard + credentials (setAllowedOrigins("*") does not)
             config.setAllowedOriginPatterns(List.of("*"));
+        } else if (hasPattern) {
+            // Allow patterns like https://*.vercel.app
+            config.setAllowedOriginPatterns(parsed);
         } else {
             config.setAllowedOrigins(parsed);
         }
