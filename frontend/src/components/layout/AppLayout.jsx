@@ -38,9 +38,13 @@ export default function AppLayout() {
       <aside className="w-60 bg-slate-950 flex flex-col flex-shrink-0">
         {/* Brand */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">I0</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="I0 SalesCore"
+            className="w-8 h-8 rounded-lg object-contain bg-white/5 flex-shrink-0"
+            loading="eager"
+            decoding="async"
+          />
           <div>
             <p className="text-white text-sm font-semibold leading-tight">SalesCore</p>
             <p className="text-slate-500 text-xs">I0 LABS</p>

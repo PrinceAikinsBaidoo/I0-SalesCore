@@ -52,9 +52,13 @@ export default function LoginPage() {
       <div className="w-full max-w-md animate-fade-in">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-500 mb-4">
-            <span className="text-white font-bold text-xl">I0</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="I0 SalesCore"
+            className="w-16 h-16 mx-auto rounded-2xl object-contain bg-white/5 mb-4"
+            loading="eager"
+            decoding="async"
+          />
           <h1 className="text-white text-2xl font-semibold tracking-tight">I0 SalesCore</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your account</p>
         </div>
