@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { DollarSign, ShoppingBag, TrendingUp, AlertTriangle, Package, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import ProductThumbnail from '@/components/ProductThumbnail'
 
 function StatCard({ label, value, sublabel, icon: Icon, color, onClick, delay = 0 }) {
   return (
@@ -105,9 +106,12 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {lowStock.slice(0, 10).map(p => (
-                  <div key={p.id} className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs font-medium text-slate-900 truncate">{p.name}</p>
-                    <p className="text-xs font-bold text-amber-600">{p.quantity} left</p>
+                  <div key={p.id} className="bg-white rounded-lg px-3 py-2 border border-amber-100 flex gap-2 items-center min-w-0">
+                    <ProductThumbnail imageUrl={p.imageUrl} alt="" size={36} fallback={Package} fallbackClassName="bg-amber-50 text-amber-600" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-slate-900 truncate">{p.name}</p>
+                      <p className="text-xs font-bold text-amber-600">{p.quantity} left</p>
+                    </div>
                   </div>
                 ))}
               </div>

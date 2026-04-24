@@ -5,6 +5,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { toast } from 'sonner'
 import { Plus, Search, Edit2, Trash2, AlertTriangle, X, Package } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ProductThumbnail from '@/components/ProductThumbnail'
 
 
 function ProductFormModal({ product, categories, onClose, onSaved }) {
@@ -219,6 +220,7 @@ export default function ProductsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50">
+              <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide w-14">Image</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Product</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Category</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Price</th>
@@ -229,10 +231,10 @@ export default function ProductsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="text-center py-12 text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-slate-400">Loading…</td></tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12">
+                <td colSpan={7} className="text-center py-12">
                   <Package size={32} className="mx-auto text-slate-300 mb-2" />
                   <p className="text-slate-400 text-sm">No products found</p>
                 </td>
@@ -246,6 +248,9 @@ export default function ProductsPage() {
                 )}
                 style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
               >
+                <td className="px-4 py-3 align-middle">
+                  <ProductThumbnail imageUrl={p.imageUrl} alt={p.name} size={44} fallback={Package} fallbackClassName="bg-slate-50 text-slate-300" />
+                </td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-slate-900">{p.name}</p>
                   {p.description && <p className="text-xs text-slate-400 mt-0.5 truncate max-w-xs">{p.description}</p>}

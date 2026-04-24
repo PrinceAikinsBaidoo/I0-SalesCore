@@ -12,6 +12,7 @@ import {
   CreditCard, Banknote, Smartphone, User, X, CheckCircle, Printer, ScanBarcode, Camera
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ProductThumbnail from '@/components/ProductThumbnail'
 
 // ─── Paystack helper ────────────────────────────────────────────────────────
 const PAYSTACK_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ?? ''
@@ -413,8 +414,14 @@ function POSContent() {
                 )}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
-                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center mb-2">
-                  <ShoppingCart size={14} className="text-blue-500" />
+                <div className="mb-2">
+                  <ProductThumbnail
+                    imageUrl={p.imageUrl}
+                    alt=""
+                    size={36}
+                    fallback={ShoppingCart}
+                    fallbackClassName="bg-blue-50 text-blue-500"
+                  />
                 </div>
                 <p className="text-xs font-semibold text-slate-900 leading-tight line-clamp-2">{p.name}</p>
                 <p className="text-sm font-bold text-blue-600 mt-1">{formatCurrency(p.price)}</p>
@@ -501,7 +508,16 @@ function POSContent() {
           ) : cart.items.map(item => (
             <div key={item.product.id} className="bg-slate-50 rounded-xl p-3 animate-slide-up">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-xs font-medium text-slate-900 leading-tight flex-1">{item.product.name}</p>
+                <div className="flex gap-2 min-w-0 flex-1">
+                  <ProductThumbnail
+                    imageUrl={item.product.imageUrl}
+                    alt=""
+                    size={40}
+                    fallback={ShoppingCart}
+                    fallbackClassName="bg-white border border-slate-200 text-slate-400"
+                  />
+                  <p className="text-xs font-medium text-slate-900 leading-tight flex-1 min-w-0">{item.product.name}</p>
+                </div>
                 <button
                   onClick={() => dispatch({ type: 'REMOVE_ITEM', productId: item.product.id })}
                   className="press-feedback text-slate-300 hover:text-red-400 transition-colors flex-shrink-0">

@@ -64,6 +64,10 @@ The `web` service proxies `/api/*` to the `api` service, so the browser uses sam
    npm run dev
    ```
 
+   For local work, do **not** set `VITE_API_BASE_URL` to your deployed Render URL in `.env` or `.env.local`. If you do, the browser still calls Render (cold starts, high latency) even though the UI is on `localhost`. Omit the variable so requests use `/api/v1` and the Vite proxy to `localhost:8080`.
+
+   **Also check:** Vite prefers **shell / Windows user** `VITE_API_BASE_URL` over `.env` files. Run `Get-ChildItem Env:VITE_API_BASE_URL` in PowerShell and remove it from *System Properties → Environment Variables* if it is set. For `npm run dev`, `vite.config.js` clears that process variable before loading `.env*`, so the app defaults to `/api/v1` and the proxy; you can still set `VITE_API_BASE_URL` in a `.env` / `.env.development.local` file if you intentionally want a remote API while developing.
+
 ## Health check
 
 - `GET /actuator/health` — no authentication (use for load balancers / uptime checks).

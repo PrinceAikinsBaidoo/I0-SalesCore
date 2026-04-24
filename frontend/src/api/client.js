@@ -1,6 +1,19 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+/**
+ * In Vite dev, `import.meta.env.VITE_API_BASE_URL` can still be an absolute URL (e.g. Render)
+ * if it was set in the shell, in a cached transform, or pulled by another tool. Using that
+ * from localhost causes CORS failures. Same-origin `/api/v1` always goes through the proxy.
+ */
+function resolveApiBaseUrl() {
+  const raw = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+  if (import.meta.env.DEV && typeof raw === 'string' && /^https?:\/\//i.test(raw)) {
+    return '/api/v1'
+  }
+  return raw
+}
+
+const baseURL = resolveApiBaseUrl()
 
 const client = axios.create({
   baseURL,
@@ -37,8 +50,8 @@ client.interceptors.response.use(
 )
 
 /**
- * Fire-and-forget health ping to wake the Render backend from sleep.
- * Called once on app start so the backend is warm by the time the user logs in.
+ * Fire-and-forget health ping (local: `/actuator/health` via Vite proxy; prod: same host as API).
+ * On hosted backends that sleep (e.g. Render free tier), this can warm the instance before login.
  */
 export function pingBackend() {
   const healthUrl = baseURL.replace(/\/api\/v1\/?$/, '/actuator/health')
