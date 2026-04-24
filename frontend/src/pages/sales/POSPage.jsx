@@ -351,7 +351,12 @@ function POSContent() {
         referenceNumber: paystackRef ?? null,
       }
       const { data } = await salesApi.create(payload)
-      const normalizedSale = data?.id ? data : (data?.sale?.id ? data.sale : data)
+      const saleCandidate = data?.sale ?? data
+      const normalizedSale = {
+        ...(saleCandidate ?? {}),
+        // Be defensive: some deployments may return { saleId } or wrap the sale object.
+        id: (saleCandidate?.id ?? data?.id ?? data?.saleId ?? saleCandidate?.saleId ?? null),
+      }
       if (!normalizedSale?.id) {
         toast.warning('Sale completed, but receipt ID was not returned. Check Sales/Reports.')
       }
